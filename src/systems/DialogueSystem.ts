@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 
 export class DialogueSystem {
+  private scene: Phaser.Scene;
   private container: Phaser.GameObjects.Container;
   private nameText: Phaser.GameObjects.Text;
   private dialogueText: Phaser.GameObjects.Text;
@@ -12,10 +13,10 @@ export class DialogueSystem {
   private isActive = false;
   private onCompleteCallback?: () => void;
 
-  private advanceKey: Phaser.Input.Keyboard.Key;
-  private spaceKey: Phaser.Input.Keyboard.Key;
+  private boundAdvance: () => void;
 
   constructor(scene: Phaser.Scene) {
+    this.scene = scene;
     const cam = scene.cameras.main;
     const boxWidth = cam.width - 40;
     const boxHeight = 120;
@@ -53,8 +54,8 @@ export class DialogueSystem {
 
     this.container.setVisible(false);
 
-    this.advanceKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-    this.spaceKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    // Use a bound method for event listeners so we can add/remove cleanly
+    this.boundAdvance = this.advance.bind(this);
   }
 
   startDialogue(npcName: string, dialogue: string[], onComplete?: () => void): void {
@@ -67,6 +68,22 @@ export class DialogueSystem {
     this.dialogueText.setText(dialogue[0]);
     this.container.setVisible(true);
     this.updatePromptText();
+
+    // Register event listeners only while dialogue is active
+    this.scene.input.keyboard!.on('keydown-ENTER', this.boundAdvance);
+    this.scene.input.keyboard!.on('keydown-SPACE', this.boundAdvance);
+  }
+
+  private advance(): void {
+    if (!this.isActive) return;
+
+    this.currentIndex++;
+    if (this.currentIndex >= this.currentDialogue.length) {
+      this.close();
+    } else {
+      this.dialogueText.setText(this.currentDialogue[this.currentIndex]);
+      this.updatePromptText();
+    }
   }
 
   private updatePromptText(): void {
@@ -78,22 +95,17 @@ export class DialogueSystem {
   }
 
   update(): void {
-    if (!this.isActive) return;
-
-    if (Phaser.Input.Keyboard.JustDown(this.advanceKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      this.currentIndex++;
-      if (this.currentIndex >= this.currentDialogue.length) {
-        this.close();
-      } else {
-        this.dialogueText.setText(this.currentDialogue[this.currentIndex]);
-        this.updatePromptText();
-      }
-    }
+    // No longer polling — handled by event listeners
   }
 
   private close(): void {
     this.isActive = false;
     this.container.setVisible(false);
+
+    // Remove event listeners when dialogue closes
+    this.scene.input.keyboard!.off('keydown-ENTER', this.boundAdvance);
+    this.scene.input.keyboard!.off('keydown-SPACE', this.boundAdvance);
+
     this.onCompleteCallback?.();
   }
 

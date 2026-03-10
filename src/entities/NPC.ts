@@ -8,6 +8,7 @@ export class NPC {
   private indicator: Phaser.GameObjects.Text;
   private nameLabel: Phaser.GameObjects.Text;
   private hasBeenTalkedTo = false;
+  private bodyGroup: Phaser.GameObjects.Container;
 
   constructor(scene: Phaser.Scene, npcData: NPCData) {
     this.data = npcData;
@@ -16,13 +17,44 @@ export class NPC {
 
     this.sprite = scene.add.container(px, py);
 
-    // Body circle
-    const body = scene.add.circle(0, 0, 10, npcData.color);
-    this.sprite.add(body);
+    // Drop shadow
+    const shadow = scene.add.ellipse(0, TILE_SIZE * 0.3, TILE_SIZE * 0.6, TILE_SIZE * 0.2, 0x000000, 0.3);
+    this.sprite.add(shadow);
 
-    // Head/dot on top
+    // Body group for idle animation
+    this.bodyGroup = scene.add.container(0, 0);
+
+    // Body circle with slight outline
+    const bodyOutline = scene.add.circle(0, 0, 11, 0x000000, 0.3);
+    this.bodyGroup.add(bodyOutline);
+    const body = scene.add.circle(0, 0, 10, npcData.color);
+    this.bodyGroup.add(body);
+
+    // Lighter highlight on body
+    const highlight = scene.add.circle(-3, -3, 4, 0xffffff, 0.15);
+    this.bodyGroup.add(highlight);
+
+    // Head with outline
+    const headOutline = scene.add.circle(0, -8, 6, 0x000000, 0.3);
+    this.bodyGroup.add(headOutline);
     const head = scene.add.circle(0, -8, 5, npcData.color);
-    this.sprite.add(head);
+    this.bodyGroup.add(head);
+
+    // Lighter head accent
+    const headHighlight = scene.add.circle(-1.5, -9.5, 2, 0xffffff, 0.2);
+    this.bodyGroup.add(headHighlight);
+
+    this.sprite.add(this.bodyGroup);
+
+    // Idle breathing/bobbing animation
+    scene.tweens.add({
+      targets: this.bodyGroup,
+      y: -1.5,
+      duration: 1200 + Math.random() * 600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
 
     // Name label
     this.nameLabel = scene.add.text(0, -22, npcData.name, {

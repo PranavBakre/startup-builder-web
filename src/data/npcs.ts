@@ -25,7 +25,7 @@ export const NPC_DATA: NPCData[] = [
     id: 'npc_james',
     name: 'James',
     color: 0x3498db,
-    position: { x: 15, y: 3 },
+    position: { x: 15, y: 5 },
     dialogue: [
       "Oh hi! I'm James. I do freelance graphic design.",
       "Business is good, but man, health insurance is a nightmare.",

@@ -163,6 +163,9 @@ export class NotebookSystem {
       padding: { x: 20, y: 10 },
     }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
 
+    // Register with UI camera only
+    cam.ignore(confirmText);
+
     this.scene.tweens.add({
       targets: confirmText,
       alpha: 0,
@@ -203,5 +206,9 @@ export class NotebookSystem {
 
   getIsOpen(): boolean {
     return this.isOpen;
+  }
+
+  getUIObjects(): Phaser.GameObjects.GameObject[] {
+    return [this.container];
   }
 }

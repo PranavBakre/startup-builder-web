@@ -8,16 +8,19 @@ import { MovementSystem } from '../systems/MovementSystem';
 import { DialogueSystem } from '../systems/DialogueSystem';
 import { NotebookSystem } from '../systems/NotebookSystem';
 import { HUD } from '../ui/HUD';
+import { Minimap } from '../ui/Minimap';
 
 export class GameScene extends Phaser.Scene {
   private movementSystem!: MovementSystem;
   private dialogueSystem!: DialogueSystem;
   private notebookSystem!: NotebookSystem;
   private hud!: HUD;
+  private minimap!: Minimap;
   private npcs: NPC[] = [];
   private player!: Phaser.GameObjects.Container;
-  private chatKey!: Phaser.Input.Keyboard.Key;
-  private interactKey!: Phaser.Input.Keyboard.Key;
+  private chatPending = false;
+  private interactPending = false;
+  private uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -35,9 +38,10 @@ export class GameScene extends Phaser.Scene {
     this.dialogueSystem = new DialogueSystem(this);
     this.notebookSystem = new NotebookSystem(this);
     this.hud = new HUD(this, NPC_DATA.length);
+    this.minimap = new Minimap(this, this.npcs);
 
-    this.chatKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.C);
-    this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.input.keyboard!.on('keydown-C', () => { this.chatPending = true; });
+    this.input.keyboard!.on('keydown-E', () => { this.interactPending = true; });
 
     // Camera setup
     const mapPixelWidth = MAP_WIDTH * TILE_SIZE;
@@ -46,16 +50,41 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setZoom(2);
 
+    // UI camera — unzoomed, renders only UI elements at 1:1 screen size
+    this.uiCamera = this.cameras.add(0, 0, this.cameras.main.width, this.cameras.main.height);
+    this.uiCamera.setScroll(0, 0);
+
+    // Main camera should NOT render UI objects; UI camera should ONLY render them
+    const uiObjects: Phaser.GameObjects.GameObject[] = [
+      ...this.dialogueSystem.getUIObjects(),
+      ...this.notebookSystem.getUIObjects(),
+      ...this.hud.getUIObjects(),
+      ...this.minimap.getUIObjects(),
+    ];
+    for (const obj of uiObjects) {
+      this.cameras.main.ignore(obj);
+    }
+    // UI camera ignores everything EXCEPT UI objects
+    for (const child of this.children.list) {
+      if (!uiObjects.includes(child)) {
+        this.uiCamera.ignore(child);
+      }
+    }
+
     // Vignette effect for atmosphere
     this.addVignette();
 
     this.movementSystem.onMove(() => {
       this.checkNPCProximity();
       this.checkDoorProximity();
+      const pos = this.movementSystem.getPosition();
+      this.minimap.updatePlayerPosition(pos.x, pos.y);
     });
 
-    // Initial check
+    // Initial state
     this.checkNPCProximity();
+    const startPos = this.movementSystem.getPosition();
+    this.minimap.updatePlayerPosition(startPos.x, startPos.y);
   }
 
   private addVignette(): void {
@@ -63,6 +92,7 @@ export class GameScene extends Phaser.Scene {
     const w = cam.width;
     const h = cam.height;
     const vignette = this.add.graphics().setScrollFactor(0).setDepth(90);
+    this.uiCamera.ignore(vignette);
 
     // Layered rectangles at edges for a simple vignette effect
     vignette.fillStyle(0x000000, 0.12);
@@ -276,6 +306,9 @@ export class GameScene extends Phaser.Scene {
               padding: { x: 12, y: 6 },
             }).setOrigin(0.5).setScrollFactor(0).setDepth(150);
 
+            // Register with UI camera
+            this.cameras.main.ignore(notif);
+
             this.tweens.add({
               targets: notif,
               alpha: 0,
@@ -336,13 +369,15 @@ export class GameScene extends Phaser.Scene {
     if (this.notebookSystem.getIsOpen()) return;
 
     // Chat input
-    if (Phaser.Input.Keyboard.JustDown(this.chatKey)) {
+    if (this.chatPending) {
+      this.chatPending = false;
       this.tryChat();
       return;
     }
 
     // Interact with doors
-    if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+    if (this.interactPending) {
+      this.interactPending = false;
       const pos = this.movementSystem.getPosition();
       const tile = MAP_DATA[pos.y][pos.x];
       if (tile === TileType.BUILDING_DOOR) {

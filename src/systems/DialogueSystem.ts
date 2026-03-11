@@ -112,4 +112,8 @@ export class DialogueSystem {
   getIsActive(): boolean {
     return this.isActive;
   }
+
+  getUIObjects(): Phaser.GameObjects.GameObject[] {
+    return [this.container];
+  }
 }

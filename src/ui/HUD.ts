@@ -57,6 +57,10 @@ export class HUD {
     this.interactionText.setVisible(false);
   }
 
+  getUIObjects(): Phaser.GameObjects.GameObject[] {
+    return [this.founderText, this.problemCountText, this.hintsText, this.interactionText];
+  }
+
   destroy(): void {
     this.founderText.destroy();
     this.problemCountText.destroy();
